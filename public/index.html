@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PictureTagger — Тэги и динамические коллекции</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">
+          <span class="brand-icon">◈</span>
+          <span class="brand-name">PictureTagger</span>
+        </div>
+        <button id="btn-open-folder" class="btn btn-primary">
+          <span>📁</span> Выбрать папку
+        </button>
+        <div class="folder-pill" id="folder-pill" title="Текущая папка">
+          <span id="current-folder-text">Папка не выбрана</span>
+        </div>
+        <label class="checkbox-inline" title="Сканировать вложенные папки">
+          <input type="checkbox" id="chk-recursive" />
+          <span>Подпапки</span>
+        </label>
+      </div>
+
+      <div class="topbar-right">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Поиск по имени файла..." />
+          <button id="btn-clear-search" class="icon-btn hidden" title="Очистить поиск">✕</button>
+        </div>
+        <div class="size-control" title="Размер миниатюр">
+          <span class="size-label">▦</span>
+          <input type="range" id="thumb-size" min="150" max="340" value="220" />
+        </div>
+        <button id="btn-shutdown" class="btn btn-sm btn-danger-outline" title="Остановить локальный сервер PictureTagger">⏻ Завершить работу</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <section class="sidebar-section">
+          <div class="section-header">
+            <h3>Обзор</h3>
+          </div>
+          <ul class="nav-list">
+            <li>
+              <button class="nav-item active" id="nav-all" data-view="all">
+                <span>🖼️ Все картинки</span>
+                <span class="badge" id="count-all">0</span>
+              </button>
+            </li>
+            <li>
+              <button class="nav-item" id="nav-untagged" data-view="untagged">
+                <span>🏷️ Без тэгов</span>
+                <span class="badge" id="count-untagged">0</span>
+              </button>
+            </li>
+          </ul>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-header">
+            <h3>Динамические коллекции</h3>
+            <button id="btn-new-collection" class="icon-btn" title="Создать коллекцию из текущего фильтра">＋</button>
+          </div>
+          <div id="collections-list" class="collections-list"></div>
+          <div id="collections-empty" class="empty-hint">
+            Выберите тэги и сохраните фильтр как динамическую коллекцию
+          </div>
+        </section>
+
+        <section class="sidebar-section sidebar-tags-section">
+          <div class="section-header">
+            <h3>Тэги</h3>
+            <div class="logic-switch tags-view-switch" title="Режим отображения тэгов">
+              <button class="logic-btn active" id="btn-tags-flat" type="button">Все тэги</button>
+              <button class="logic-btn" id="btn-tags-grouped" type="button">По группам</button>
+            </div>
+          </div>
+
+          <form id="create-tag-form" class="create-tag-form">
+            <div class="create-tag-row">
+              <input type="color" id="new-tag-color" value="#6366f1" title="Цвет тэга" />
+              <input type="text" id="new-tag-name" placeholder="Новый тэг..." autocomplete="off" />
+              <button type="submit" class="btn btn-sm btn-secondary" title="Создать тэг">＋</button>
+            </div>
+          </form>
+          <form id="create-group-form" class="create-tag-row">
+            <input type="text" id="new-group-name" class="tag-group-input" placeholder="Создать группу..." autocomplete="off" />
+            <button type="submit" class="btn btn-sm btn-secondary" title="Создать группу">＋</button>
+          </form>
+          <datalist id="tag-groups-datalist"></datalist>
+
+          <div id="tags-list" class="tags-list"></div>
+          <div id="tags-empty" class="empty-hint">Нет созданных тэгов</div>
+        </section>
+      </aside>
+
+      <!-- Main Area -->
+      <main class="main-content">
+        <!-- Dynamic Filter Bar -->
+        <div class="filter-bar" id="filter-bar">
+          <div class="filter-bar-left">
+            <div class="logic-switch" title="Логика фильтрации по выбранным тэгам">
+              <button class="logic-btn active" data-mode="AND" id="btn-mode-and">И (Все)</button>
+              <button class="logic-btn" data-mode="OR" id="btn-mode-or">ИЛИ (Любой)</button>
+            </div>
+            <div id="active-filter-chips" class="active-filter-chips">
+              <span class="filter-placeholder">Выберите тэги слева для динамической фильтрации</span>
+            </div>
+          </div>
+          <div class="filter-bar-right">
+            <span class="results-count" id="results-count">0 из 0</span>
+            <div class="sort-control" title="Сортировка галереи">
+              <select id="sort-field">
+                <option value="name">По имени</option>
+                <option value="date">По дате</option>
+                <option value="size">По размеру</option>
+                <option value="tags">По кол-ву тэгов</option>
+              </select>
+              <button id="btn-sort-dir" class="btn btn-sm btn-secondary" title="Направление сортировки: по возрастанию">↑</button>
+            </div>
+            <button id="btn-random-all" class="btn btn-sm btn-secondary" title="Открыть случайную картинку из всех картинок">🎲 Случайная (все)</button>
+            <button id="btn-random-filtered" class="btn btn-sm btn-secondary" title="Открыть случайную картинку с выбранными тэгами">🎲 Случайная (по тэгам)</button>
+            <button id="btn-select-all" class="btn btn-sm btn-secondary">Выбрать все</button>
+            <button id="btn-save-collection" class="btn btn-sm btn-primary hidden">💾 Сохранить коллекцию</button>
+            <button id="btn-reset-filter" class="btn btn-sm btn-ghost hidden">Сбросить</button>
+          </div>
+        </div>
+
+        <!-- Batch Action Bar -->
+        <div class="batch-bar hidden" id="batch-bar">
+          <div class="batch-info">
+            <span>Выбрано: <strong id="selected-count">0</strong></span>
+            <button id="btn-clear-selection" class="btn btn-sm btn-ghost">Снять выделение</button>
+          </div>
+          <div class="batch-actions">
+            <div class="batch-tag-picker">
+              <select id="batch-tag-select">
+                <option value="">— Выберите тэг —</option>
+              </select>
+              <button id="btn-batch-add-tag" class="btn btn-sm btn-primary">＋ Добавить тэг</button>
+              <button id="btn-batch-remove-tag" class="btn btn-sm btn-danger-outline">− Убрать тэг</button>
+            </div>
+            <form id="batch-quick-tag-form" class="batch-quick-tag-form">
+              <input type="text" id="batch-new-tag-input" placeholder="Или создать и назначить..." autocomplete="off" />
+              <button type="submit" class="btn btn-sm btn-secondary">Применить</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Gallery Container -->
+        <div class="gallery-wrapper" id="gallery-wrapper">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-state-icon">📂</div>
+            <h2>Выберите папку с картинками</h2>
+            <p>Нажмите «Выбрать папку» вверху, чтобы загрузить изображения и начать расставлять тэги.</p>
+            <button id="btn-empty-choose" class="btn btn-primary">Выбрать папку</button>
+          </div>
+          <div id="gallery-grid" class="gallery-grid"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Quick Tag Popover (attached dynamically to cards) -->
+  <div id="quick-tag-popover" class="popover hidden">
+    <input type="text" id="popover-tag-input" placeholder="Найти или создать тэг..." autocomplete="off" />
+    <div id="popover-tag-list" class="popover-tag-list"></div>
+  </div>
+
+  <!-- Folder Browser Modal -->
+  <div id="folder-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3>Выбор папки с картинками</h3>
+        <button class="icon-btn modal-close" data-close="folder-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="folder-path-row">
+          <input type="text" id="folder-path-input" placeholder="Введите путь к папке, например C:\Users\..." />
+          <button id="btn-go-path" class="btn btn-secondary">Перейти</button>
+          <button id="btn-native-pick" class="btn btn-primary" title="Открыть стандартное окно выбора папки Windows">Системный диалог</button>
+        </div>
+
+        <div class="folder-nav-bar">
+          <button id="btn-folder-up" class="btn btn-sm btn-secondary">⬆ Наверх</button>
+          <span id="folder-browser-current" class="folder-browser-current">Компьютер</span>
+        </div>
+
+        <div class="folder-browser-split">
+          <div class="folder-list-pane">
+            <div class="pane-title">Папки</div>
+            <div id="folder-browser-list" class="folder-browser-list"></div>
+          </div>
+          <div class="recent-folders-pane">
+            <div class="pane-title">Недавние папки</div>
+            <div id="recent-folders-list" class="recent-folders-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label class="checkbox-inline">
+          <input type="checkbox" id="modal-chk-recursive" />
+          <span>Включая подпапки</span>
+        </label>
+        <div class="modal-footer-actions">
+          <button class="btn btn-ghost modal-close" data-close="folder-modal">Отмена</button>
+          <button id="btn-confirm-folder" class="btn btn-primary">Открыть эту папку</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Collection Modal -->
+  <div id="collection-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Сохранить динамическую коллекцию</h3>
+        <button class="icon-btn modal-close" data-close="collection-modal">✕</button>
+      </div>
+      <form id="collection-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="collection-name-input">Название коллекции</label>
+            <input type="text" id="collection-name-input" placeholder="Например: Закаты без людей" required autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Условие фильтрации</label>
+            <div id="collection-summary" class="collection-summary"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost modal-close" data-close="collection-modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="lightbox-container">
+      <button id="lightbox-close" class="lightbox-close" title="Закрыть (Esc)">✕</button>
+      <div class="lightbox-stage">
+        <button id="lightbox-prev" class="lightbox-nav lightbox-prev" title="Предыдущее (←)">‹</button>
+        <img id="lightbox-img" src="" alt="" />
+        <button id="lightbox-next" class="lightbox-nav lightbox-next" title="Следующее (→)">›</button>
+      </div>
+      <aside class="lightbox-sidebar">
+        <div class="lightbox-meta">
+          <h3 id="lightbox-filename">filename.jpg</h3>
+          <p id="lightbox-path" class="meta-sub"></p>
+          <div class="meta-stats">
+            <span id="lightbox-dimensions">—</span>
+            <span id="lightbox-size">—</span>
+          </div>
+        </div>
+        <div class="lightbox-tags-panel">
+          <h4>Тэги изображения</h4>
+          <form id="lightbox-add-tag-form" class="lightbox-add-tag-form">
+            <input type="text" id="lightbox-tag-input" placeholder="Добавить или создать тэг..." autocomplete="off" />
+            <button type="submit" class="btn btn-sm btn-primary">＋</button>
+          </form>
+          <div id="lightbox-tags-list" class="lightbox-tags-list"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Edit Tag Modal -->
+  <div id="tag-edit-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Редактировать тэг</h3>
+        <button class="icon-btn modal-close" data-close="tag-edit-modal">✕</button>
+      </div>
+      <form id="tag-edit-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="edit-tag-name">Название тэга</label>
+            <input type="text" id="edit-tag-name" required autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="edit-tag-group">Группа (оставьте пустым, чтобы без группы)</label>
+            <input type="text" id="edit-tag-group" list="tag-groups-datalist" placeholder="Например: Персонажи, Стиль..." autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="edit-tag-color">Цвет</label>
+            <input type="color" id="edit-tag-color" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost modal-close" data-close="tag-edit-modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3 id="confirm-title">Подтверждение</h3>
+        <button class="icon-btn modal-close" data-close="confirm-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" class="confirm-message">Вы уверены?</p>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-actions">
+          <button type="button" id="btn-confirm-cancel" class="btn btn-ghost">Отмена</button>
+          <button type="button" id="btn-confirm-ok" class="btn btn-danger">Удалить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
